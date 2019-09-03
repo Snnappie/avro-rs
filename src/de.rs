@@ -1,13 +1,18 @@
 //! Logic for serde-compatible deserialization.
-use std::collections::hash_map::{Keys, Values};
-use std::collections::HashMap;
+use std::collections::{
+    hash_map::{Keys, Values},
+    HashMap,
+};
 use std::error::{self, Error as StdError};
 use std::fmt;
 use std::slice::Iter;
 
-use serde::de::{self, Deserialize, DeserializeSeed, Error as SerdeError, Visitor};
+use serde::{
+    de::{self, DeserializeSeed, Error as SerdeError, Visitor},
+    forward_to_deserialize_any, Deserialize,
+};
 
-use types::Value;
+use crate::types::Value;
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct Error {
@@ -316,11 +321,11 @@ impl<'de> de::MapAccess<'de> for MapDeserializer<'de> {
         K: DeserializeSeed<'de>,
     {
         match self.input_keys.next() {
-            Some(ref key) => {
-                seed.deserialize(StringDeserializer {
+            Some(ref key) => seed
+                .deserialize(StringDeserializer {
                     input: (*key).clone(),
-                }).map(Some)
-            }
+                })
+                .map(Some),
             None => Ok(None),
         }
     }
@@ -349,7 +354,8 @@ impl<'de> de::MapAccess<'de> for StructDeserializer<'de> {
                 self.value = Some(value);
                 seed.deserialize(StringDeserializer {
                     input: field.clone(),
-                }).map(Some)
+                })
+                .map(Some)
             }
             None => Ok(None),
         }

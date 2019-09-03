@@ -2,16 +2,16 @@
 use std::collections::HashMap;
 use std::io::Write;
 
-use failure::Error;
+use failure::{Error, Fail};
 use rand::random;
 use serde::Serialize;
 use serde_json;
 
-use encode::{encode, encode_ref, encode_to_vec};
-use schema::Schema;
-use ser::Serializer;
-use types::{ToAvro, Value};
-use Codec;
+use crate::encode::{encode, encode_ref, encode_to_vec};
+use crate::schema::Schema;
+use crate::ser::Serializer;
+use crate::types::{ToAvro, Value};
+use crate::Codec;
 
 const SYNC_SIZE: usize = 16;
 const SYNC_INTERVAL: usize = 1000 * SYNC_SIZE; // TODO: parametrize in Writer
@@ -20,7 +20,7 @@ const AVRO_OBJECT_HEADER: &[u8] = &[b'O', b'b', b'j', 1u8];
 
 /// Describes errors happened while validating Avro data.
 #[derive(Fail, Debug)]
-#[fail(display = "Decoding error: {}", _0)]
+#[fail(display = "Validation error: {}", _0)]
 pub struct ValidationError(String);
 
 impl ValidationError {
@@ -101,7 +101,7 @@ impl<'a, W: Write> Writer<'a, W> {
         self.num_values += 1;
 
         if self.buffer.len() >= SYNC_INTERVAL {
-            return self.flush().map(|b| b + n)
+            return self.flush().map(|b| b + n);
         }
 
         Ok(n)
@@ -129,7 +129,7 @@ impl<'a, W: Write> Writer<'a, W> {
         self.num_values += 1;
 
         if self.buffer.len() >= SYNC_INTERVAL {
-            return self.flush().map(|b| b + n)
+            return self.flush().map(|b| b + n);
         }
 
         Ok(n)
@@ -241,7 +241,7 @@ impl<'a, W: Write> Writer<'a, W> {
     /// Return the number of bytes written.
     pub fn flush(&mut self) -> Result<usize, Error> {
         if self.num_values == 0 {
-            return Ok(0)
+            return Ok(0);
         }
 
         self.codec.compress(&mut self.buffer)?;
@@ -318,7 +318,7 @@ fn write_avro_datum<T: ToAvro>(
 ) -> Result<(), Error> {
     let avro = value.avro();
     if !avro.validate(schema) {
-        return Err(ValidationError::new("value does not match schema").into())
+        return Err(ValidationError::new("value does not match schema").into());
     }
     encode(&avro, schema, buffer);
     Ok(())
@@ -326,7 +326,7 @@ fn write_avro_datum<T: ToAvro>(
 
 fn write_value_ref(schema: &Schema, value: &Value, buffer: &mut Vec<u8>) -> Result<(), Error> {
     if !value.validate(schema) {
-        return Err(ValidationError::new("value does not match schema").into())
+        return Err(ValidationError::new("value does not match schema").into());
     }
     encode_ref(value, schema, buffer);
     Ok(())
@@ -347,8 +347,9 @@ pub fn to_avro_datum<T: ToAvro>(schema: &Schema, value: T) -> Result<Vec<u8>, Er
 #[cfg(test)]
 mod tests {
     use super::*;
-    use types::Record;
-    use util::zig_i64;
+    use crate::types::Record;
+    use crate::util::zig_i64;
+    use serde::{Deserialize, Serialize};
 
     static SCHEMA: &'static str = r#"
             {

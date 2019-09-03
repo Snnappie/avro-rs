@@ -1,7 +1,8 @@
+use std::i64;
 use std::io::Read;
 use std::sync::{Once, ONCE_INIT};
 
-use failure::Error;
+use failure::{Error, Fail};
 use serde_json::{Map, Value};
 
 /// Maximum number of bytes that can be allocated when decoding
@@ -64,11 +65,11 @@ pub fn read_long<R: Read>(reader: &mut R) -> Result<i64, Error> {
 }
 
 pub fn zig_i32(n: i32, buffer: &mut Vec<u8>) {
-    encode_variable(i64::from((n << 1) ^ (n >> 31)), buffer)
+    zig_i64(n as i64, buffer)
 }
 
 pub fn zig_i64(n: i64, buffer: &mut Vec<u8>) {
-    encode_variable((n << 1) ^ (n >> 31), buffer)
+    encode_variable(((n << 1) ^ (n >> 63)) as u64, buffer)
 }
 
 pub fn zag_i32<R: Read>(reader: &mut R) -> Result<i32, Error> {
@@ -89,11 +90,11 @@ pub fn zag_i64<R: Read>(reader: &mut R) -> Result<i64, Error> {
     })
 }
 
-fn encode_variable(mut z: i64, buffer: &mut Vec<u8>) {
+fn encode_variable(mut z: u64, buffer: &mut Vec<u8>) {
     loop {
         if z <= 0x7F {
             buffer.push((z & 0x7F) as u8);
-            break
+            break;
         } else {
             buffer.push((0x80 | (z & 0x7F)) as u8);
             z >>= 7;
@@ -109,12 +110,12 @@ fn decode_variable<R: Read>(reader: &mut R) -> Result<u64, Error> {
     loop {
         if j > 9 {
             // if j * 7 > 64
-            return Err(DecodeError::new("Overflow when decoding integer value").into())
+            return Err(DecodeError::new("Overflow when decoding integer value").into());
         }
         reader.read_exact(&mut buf[..])?;
         i |= (u64::from(buf[0] & 0x7F)) << (j * 7);
         if (buf[0] >> 7) == 0 {
-            break
+            break;
         } else {
             j += 1;
         }
@@ -148,7 +149,8 @@ pub fn safe_len(len: usize) -> Result<usize, Error> {
         Err(AllocationError::new(format!(
             "Unable to allocate {} bytes (Maximum allowed: {})",
             len, max_bytes
-        )).into())
+        ))
+        .into())
     }
 }
 
@@ -163,6 +165,60 @@ mod tests {
         zig_i32(42i32, &mut a);
         zig_i64(42i64, &mut b);
         assert_eq!(a, b);
+    }
+
+    #[test]
+    fn test_zig_i64() {
+        let mut s = Vec::new();
+        zig_i64(2147483647i64, &mut s);
+        assert_eq!(s, [254, 255, 255, 255, 15]);
+
+        s.clear();
+        zig_i64(2147483648i64, &mut s);
+        assert_eq!(s, [128, 128, 128, 128, 16]);
+
+        s.clear();
+        zig_i64(-2147483648i64, &mut s);
+        assert_eq!(s, [255, 255, 255, 255, 15]);
+
+        s.clear();
+        zig_i64(-2147483649i64, &mut s);
+        assert_eq!(s, [129, 128, 128, 128, 16]);
+
+        s.clear();
+        zig_i64(i64::MAX, &mut s);
+        assert_eq!(s, [254, 255, 255, 255, 255, 255, 255, 255, 255, 1]);
+
+        s.clear();
+        zig_i64(i64::MIN, &mut s);
+        assert_eq!(s, [255, 255, 255, 255, 255, 255, 255, 255, 255, 1]);
+    }
+
+    #[test]
+    fn test_zig_i32() {
+        let mut s = Vec::new();
+        zig_i32(1073741823i32, &mut s);
+        assert_eq!(s, [254, 255, 255, 255, 7]);
+
+        s.clear();
+        zig_i32(-1073741824i32, &mut s);
+        assert_eq!(s, [255, 255, 255, 255, 7]);
+
+        s.clear();
+        zig_i32(1073741824i32, &mut s);
+        assert_eq!(s, [128, 128, 128, 128, 8]);
+
+        s.clear();
+        zig_i32(-1073741825i32, &mut s);
+        assert_eq!(s, [129, 128, 128, 128, 8]);
+
+        s.clear();
+        zig_i32(2147483647i32, &mut s);
+        assert_eq!(s, [254, 255, 255, 255, 15]);
+
+        s.clear();
+        zig_i32(-2147483648i32, &mut s);
+        assert_eq!(s, [255, 255, 255, 255, 15]);
     }
 
     #[test]

@@ -20,20 +20,17 @@ Add to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-avro-rs = "^0.6"
+avro-rs = "0.6"
+failure = "0.1.5"
+serde = { version = "1.0", features = ["derive"] }
 ```
 
 Then try to write and read in Avro format like below:
 
 ```rust
-extern crate avro_rs;
-
-#[macro_use]
-extern crate serde_derive;
-extern crate failure;
-
 use avro_rs::{Codec, Reader, Schema, Writer, from_value, types::Record};
 use failure::Error;
+use serde::{Serialize, Deserialize};
 
 #[derive(Debug, Deserialize, Serialize)]
 struct Test {
@@ -84,6 +81,41 @@ fn main() -> Result<(), Error> {
 }
 ```
 
+### Calculate Avro schema fingerprint
+
+This library supports calculating the following fingerprints:
+
+ - SHA-256
+ - MD5
+
+Note: Rabin fingerprinting is NOT SUPPORTED yet.
+
+An example of fingerprinting for the supported fingerprints:
+
+```rust
+use avro_rs::Schema;
+use failure::Error;
+use md5::Md5;
+use sha2::Sha256;
+
+fn main() -> Result<(), Error> {
+    let raw_schema = r#"
+        {
+            "type": "record",
+            "name": "test",
+            "fields": [
+                {"name": "a", "type": "long", "default": 42},
+                {"name": "b", "type": "string"}
+            ]
+        }
+    "#;
+    let schema = Schema::parse_str(raw_schema)?;
+    println!("{}", schema.fingerprint::<Sha256>());
+    println!("{}", schema.fingerprint::<Md5>());
+    Ok(())
+}
+```
+
 ### Ill-formed data
 
 In order to ease decoding, the Binary Encoding specification of Avro data
@@ -98,14 +130,13 @@ to any allocation it will perform when decoding data.
 
 If you expect some of your data fields to be larger than this limit, be sure
 to make use of the `max_allocation_bytes` function before reading **any** data
-(we leverage Rust's [`std::sync::Once`](https://doc.rust-lang.org/std/sync/struct.Once.html) mechanism to initialize this value, if
+(we leverage Rust's [`std::sync::Once`](https://doc.rust-lang.org/std/sync/struct.Once.html)
+mechanism to initialize this value, if
 any call to decode is made before a call to `max_allocation_bytes`, the limit
 will be 512MB throughout the lifetime of the program).
 
 
 ```rust
-extern crate avro_rs;
-
 use avro_rs::max_allocation_bytes;
 
 

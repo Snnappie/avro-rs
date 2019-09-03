@@ -5,12 +5,12 @@ use std::str::{from_utf8, FromStr};
 use failure::Error;
 use serde_json::from_slice;
 
-use decode::decode;
-use schema::ParseSchemaError;
-use schema::Schema;
-use types::Value;
-use util::{self, DecodeError};
-use Codec;
+use crate::decode::decode;
+use crate::schema::ParseSchemaError;
+use crate::schema::Schema;
+use crate::types::Value;
+use crate::util::{self, DecodeError};
+use crate::Codec;
 
 // Internal Block reader.
 #[derive(Debug, Clone)]
@@ -51,7 +51,7 @@ impl<R: Read> Block<R> {
         self.reader.read_exact(&mut buf)?;
 
         if buf != [b'O', b'b', b'j', 1u8] {
-            return Err(DecodeError::new("wrong magic in header").into())
+            return Err(DecodeError::new("wrong magic in header").into());
         }
 
         if let Value::Map(meta) = decode(&meta_schema, &mut self.reader)? {
@@ -69,7 +69,7 @@ impl<R: Read> Block<R> {
             if let Some(schema) = schema {
                 self.writer_schema = schema;
             } else {
-                return Err(ParseSchemaError::new("unable to parse schema").into())
+                return Err(ParseSchemaError::new("unable to parse schema").into());
             }
 
             if let Some(codec) = meta
@@ -86,7 +86,7 @@ impl<R: Read> Block<R> {
                 self.codec = codec;
             }
         } else {
-            return Err(DecodeError::new("no metadata in header").into())
+            return Err(DecodeError::new("no metadata in header").into());
         }
 
         let mut buf = [0u8; 16];
@@ -123,7 +123,9 @@ impl<R: Read> Block<R> {
                 self.reader.read_exact(&mut marker)?;
 
                 if marker != self.marker {
-                    return Err(DecodeError::new("block marker does not match header marker").into())
+                    return Err(
+                        DecodeError::new("block marker does not match header marker").into(),
+                    );
                 }
 
                 // NOTE (JAB): This doesn't fit this Reader pattern very well.
@@ -134,12 +136,14 @@ impl<R: Read> Block<R> {
                 // into the buffer. But this is fine, for now.
                 self.codec.decompress(&mut self.buf)?;
 
-                return Ok(())
-            },
-            Err(e) => if let ErrorKind::UnexpectedEof = e.downcast::<::std::io::Error>()?.kind() {
-                // to not return any error in case we only finished to read cleanly from the stream
-                return Ok(())
-            },
+                return Ok(());
+            }
+            Err(e) => {
+                if let ErrorKind::UnexpectedEof = e.downcast::<::std::io::Error>()?.kind() {
+                    // to not return any error in case we only finished to read cleanly from the stream
+                    return Ok(());
+                }
+            }
         };
         Err(DecodeError::new("unable to read block").into())
     }
@@ -156,7 +160,7 @@ impl<R: Read> Block<R> {
         if self.is_empty() {
             self.read_block_next()?;
             if self.is_empty() {
-                return Ok(None)
+                return Ok(None);
             }
         }
 
@@ -252,14 +256,14 @@ impl<'a, R: Read> Iterator for Reader<'a, R> {
     fn next(&mut self) -> Option<Self::Item> {
         // to prevent keep on reading after the first error occurs
         if self.errored {
-            return None
+            return None;
         };
         match self.read_next() {
             Ok(opt) => opt.map(Ok),
             Err(e) => {
                 self.errored = true;
                 Some(Err(e))
-            },
+            }
         }
     }
 }
@@ -287,9 +291,9 @@ pub fn from_avro_datum<R: Read>(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::types::{Record, ToAvro};
+    use crate::Reader;
     use std::io::Cursor;
-    use types::{Record, ToAvro};
-    use Reader;
 
     static SCHEMA: &'static str = r#"
             {

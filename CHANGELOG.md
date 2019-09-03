@@ -6,6 +6,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.5] - 2019-03-09
+### Fixed
+- Allow Array(Int) to be converted to Bytes
+- Fix enum type deserialization bug
+
+## [0.6.4] - 2018-12-24
+### Fixed
+- Variable-length encoding for big i64 numbers
+
+## [0.6.3]- 2018-12-19
+### Added
+- Schema fingerprint (md5, sha256) generation
+
+## [0.6.2]- 2018-12-04
+### Fixed
+- Snappy codec
+
+## [0.6.1]- 2018-10-07
+### Fixed
+- Encoding of i32/i64
+
 ## [0.6.0]- 2018-08-11
 ### Added
 - impl Send+Sync for Schema (non-backwards compatible)

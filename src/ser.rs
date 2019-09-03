@@ -4,9 +4,12 @@ use std::error;
 use std::fmt;
 use std::iter::once;
 
-use serde::ser::{self, Error as SerdeError, Serialize};
+use serde::{
+    ser::{self, Error as SerdeError},
+    Serialize,
+};
 
-use types::{ToAvro, Value};
+use crate::types::{ToAvro, Value};
 
 #[derive(Clone, Default)]
 pub struct Serializer {}
@@ -413,6 +416,7 @@ pub fn to_value<S: Serialize>(value: S) -> Result<Value, Error> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use serde::{Deserialize, Serialize};
 
     #[derive(Debug, Deserialize, Serialize)]
     struct Test {
